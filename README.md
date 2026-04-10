@@ -2,89 +2,84 @@
 
 # ⚾ HR Scout — GitHub Pages Edition
 
-MLB home run prediction dashboard. You update `predictions.json` each morning
-by hand — no API keys, no automation, no build step required.
+Fully self-contained MLB home run prediction dashboard.
+No AI, no API keys. Pure Python statistical scoring from live MLB/Statcast data.
 
 ---
 
-## Setup (one-time, ~5 minutes)
-
-### 1. Create a GitHub repo and enable Pages
-
-Go to **Settings → Pages → Source** → branch: `main`, folder: `/ (root)`.
-
-Your site will be live at `https://your-username.github.io/repo-name/`
-
-### 2. Push these three files
+## How it works
 
 ```
-index.html          ← the dashboard (never needs editing)
-predictions.json    ← placeholder; you overwrite this each morning
-history/            ← optional per-day archive folder
-```
-
-That's it. No secrets, no Actions, no dependencies.
-
----
-
-## Daily workflow (each morning)
-
-```
-1. Run notebook cells 1–4  →  generates the Claude prompt
-2. Paste prompt into Claude.ai
-3. Copy Claude's JSON response
-4. Overwrite predictions.json with the JSON
-5. git add predictions.json && git commit -m "predictions $(date +%Y-%m-%d)" && git push
-```
-
-The site updates the moment you push. Anyone visiting the URL sees the new
-rankings immediately — the page fetches `predictions.json` on every load.
-
-### One-liner (Mac)
-
-```bash
-# After copying Claude's JSON from the chat:
-pbpaste > predictions.json
-cp predictions.json "history/$(date +%Y-%m-%d).json"
-git add predictions.json history/
-git commit -m "predictions $(date +%Y-%m-%d)"
-git push
-```
-
-### One-liner (Windows PowerShell)
-
-```powershell
-Get-Clipboard | Out-File predictions.json -Encoding utf8
-Copy-Item predictions.json "history/$(Get-Date -Format yyyy-MM-dd).json"
-git add predictions.json history/
-git commit -m "predictions $(Get-Date -Format yyyy-MM-dd)"
-git push
+Notebook Cell 1-5 (run each morning)
+  ├── Fetch today's schedule, lineups, probable pitchers  (MLB Stats API)
+  ├── Fetch Statcast power metrics                        (pybaseball)
+  ├── Fetch weather for outdoor parks                     (Open-Meteo)
+  ├── Score every batter with built-in statistical model
+  │     batter_score   40% — barrel%, hard-hit%, ISO, exit velo, HR rate
+  │     pitcher_score  35% — HR/9, HR/BF, hard-hit allowed
+  │     park_score     15% — park HR factor by batter hand
+  │     weather_score  10% — wind direction & speed
+  ├── Save predictions.json → git push
+  └── GitHub Pages serves updated rankings immediately
 ```
 
 ---
 
-## Tracking accuracy
+## Setup (one-time)
 
-After games complete:
-1. Paste Claude's JSON into the `PREDICTIONS` variable in **Cell 5** of the notebook
-2. Run Cell 5 and enter y/n for each player
-3. Commit the updated `hr_scout_results.json` to the repo
-4. The **History** tab on the site shows calibration data automatically
+### 1. Enable GitHub Pages
+
+Go to your repo → Settings → Pages → Source → branch: main, folder: / (root).
+
+### 2. Push these files
+
+```
+index.html             ← the dashboard (never needs editing)
+predictions.json       ← placeholder; overwritten by the notebook
+hr_scout_v4.ipynb      ← the pipeline notebook
+history/               ← auto-created by Cell 5
+```
+
+### 3. Set REPO_PATH in Cell 2
+
+```python
+REPO_PATH = '/Users/you/projects/hr-scout'  # path to your local repo clone
+```
 
 ---
 
-## File structure
+## Daily workflow
 
-```
-your-repo/
-├── index.html                ← dashboard (load-and-forget)
-├── predictions.json          ← overwrite this each morning
-├── hr_scout_results.json     ← optional: commit after logging results
-└── history/
-    ├── 2026-04-10.json
-    ├── 2026-04-11.json
-    └── ...
-```
+Run the notebook top-to-bottom each morning:
+
+| Cell | What it does |
+|------|-------------|
+| 1 | Install deps (run once) |
+| 2 | Set date, config |
+| 3 | Fetch MLB schedule, lineups, Statcast, weather |
+| 4 | Score all batters — prints top 10 preview |
+| 5 | Save predictions.json, archive to history/, git push |
+
+The website updates the moment Cell 5 finishes.
+
+---
+
+## After games: track accuracy
+
+Run Cell 6 the same evening. It prompts y/n for each player,
+saves hr_scout_results.json, and pushes it. The History tab on the
+site shows cumulative calibration data automatically.
+
+---
+
+## Scoring model
+
+Composite = batter(40%) + pitcher_vulnerability(35%) + park(15%) + weather(10%)
+
+Batter score uses: barrel%, hard-hit%, ISO, HR/PA, avg exit velo, FB%
+Pitcher vulnerability uses: HR/9, HR/BF, hard-hit% allowed, ERA
+Park score uses: park HR factor by batter handedness
+Weather score uses: wind direction/speed adjustment for outdoor parks
 
 ---
 
